@@ -1,0 +1,49 @@
+{
+  "name": "dsh-wujie-canvas",
+  "version": "0.2.0",
+  "description": "无界画布 in DeepSeek Harness: left-sidebar canvas, local workbench status/start, and DSH Agent canvas tools.",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "icon": "web/logo.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1314521gjy/dsh-wujie-canvas.git"
+  },
+  "homepage": "https://github.com/1314521gjy/dsh-wujie-canvas#readme",
+  "bugs": {
+    "url": "https://github.com/1314521gjy/dsh-wujie-canvas/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "canvas",
+    "comfyui",
+    "agent"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "web",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.1 <0.3.0-0",
+    "node": ">=22"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

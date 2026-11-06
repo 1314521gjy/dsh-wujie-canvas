@@ -1,0 +1,7 @@
+# Bundle patch: mount the local canvas under /wujie and proxy its gateway.
+- insert:
+    - id: dsh-wujie-canvas
+      name: 'dsh-wujie-canvas'
+      config:
+        gateway: 'http://127.0.0.1:8190'
+        prefix: /wujie
