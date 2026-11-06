@@ -13,13 +13,23 @@ A left-sidebar canvas page for DSH. The plugin bundles the production 无界画�
 
 ## Install
 
-Web profile:
+### Direct download (no plugin market)
+
+Prebuilt tarball: https://github.com/1314521gjy/dsh-wujie-canvas/releases/latest
+
+Web profile, install the release tarball directly:
+
+```bash
+dsh plugin --profile web add https://github.com/1314521gjy/dsh-wujie-canvas/releases/download/v0.2.0/dsh-wujie-canvas-0.2.0.tgz
+```
+
+If your DSH build only accepts a GitHub source:
 
 ```bash
 dsh plugin --profile web add github:1314521gjy/dsh-wujie-canvas
 ```
 
-Desktop DSH: use **Plugins → Add plugin** / the plugin market once this entry is listed. For local development, link this directory into the profile and add its bundle to `dsh.profile.bundles`.
+Desktop DSH: download the release archive and use the in-app plugin manager; if that build only accepts npm names, use the GitHub source and the profile bundle method (link the directory into `node_modules` and add `dsh-wujie-canvas` to `dsh.profile.bundles`). The plugin market listing is optional and does not block direct installation.
 
 ## What it does
 
