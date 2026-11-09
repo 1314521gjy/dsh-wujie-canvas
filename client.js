@@ -184,7 +184,7 @@ window.__ModuleLoader__.load({
                   ? "无界画布需要本机网关和 ComfyUI。启动会运行你已安装的工作台（含 ComfyUI），不会重复安装。"
                   : `没有找到工作台目录：${status?.workbenchRoot || "—"}。请先安装，或在插件配置里填写 workbenchRoot。`
               ),
-              launcherOk ? h("p", { style: { margin: "0 0 16px", color: "#7fc9bd", fontSize: 12 } }, "检测到启动器已在运行。") : null,
+              launcherOk ? h("p", { style: { margin: "0 0 16px", color: "#7fc9bd", fontSize: 12 } }, "检测到启动器已在运行，可直接启动画布。") : null,
               startError ? h("p", { style: { margin: "0 0 12px", color: "#f08a7e", fontSize: 12 } }, startError) : null,
               h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
                 installed ? h("button", {
@@ -197,16 +197,12 @@ window.__ModuleLoader__.load({
                   type: "button",
                   onClick: () => setDismissed(true),
                   style: buttonStyle,
-                }, "仅浏览画布"),
-                launcherOk ? h("a", {
-                  href: "http://127.0.0.1:8290/launcher",
-                  target: "_blank",
-                  rel: "noreferrer",
-                  style: { ...buttonStyle, textDecoration: "none", color: "#7fc9bd" },
-                }, "打开启动器") : null
+                }, "仅浏览画布")
               ),
               h("div", { style: { marginTop: 14, fontSize: 11, color: "#5c6a7a", lineHeight: 1.7 } },
-                "启动后会自动检测网关；ComfyUI 准备好后即可生成。"
+                "启动后会自动检测网关；ComfyUI 准备好后即可生成。",
+                h("br", null),
+                "本页画布数据与浏览器里直接打开的画布互不相通（不同源），传输请用画布内的导入/导出。"
               )
             )
           ) : null

@@ -1,7 +1,7 @@
 {
   "name": "dsh-wujie-canvas",
-  "version": "0.2.0",
-  "description": "无界画布 in DeepSeek Harness: left-sidebar canvas, local workbench status/start, and DSH Agent canvas tools.",
+  "version": "0.3.0",
+  "description": "无界画布 in DeepSeek Harness: left-sidebar canvas, local workbench status/start, deploy diagnostics and a bundled deploy skill.",
   "type": "module",
   "main": "index.js",
   "license": "MIT",

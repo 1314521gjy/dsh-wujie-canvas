@@ -24,17 +24,18 @@ export default function (runtime) {
         return Object.is(snapped, -0) ? 0 : snapped;
     }
 
-    function readLoras(node) {
+    function readLoras(node, keepEmpty = false) {
         const loras = node.metadata?.params?.loras;
         if (!Array.isArray(loras)) return [];
         return loras
-            .filter((item) => item && String(item.name || "").trim())
+            .filter((item) => item && (keepEmpty || String(item.name || "").trim()))
             .slice(0, MAX_LORAS)
-            .map((item) => ({ name: String(item.name).trim(), strength: snapStrength(item.strength) }));
+            .map((item) => ({ name: String(item.name || "").trim(), strength: snapStrength(item.strength) }));
     }
 
     function initialRows(node) {
-        const loras = readLoras(node);
+        // 空行也要保留：元数据更新会让面板重挂载，否则刚加的行会被丢掉。
+        const loras = readLoras(node, true);
         return loras.length ? loras : [{ name: "", strength: 0.8 }];
     }
 
@@ -85,7 +86,7 @@ export default function (runtime) {
 
         const commit = (nextRows) => {
             setRows(nextRows);
-            const loras = nextRows.filter((row) => String(row.name || "").trim()).map((row) => ({ name: String(row.name).trim(), strength: snapStrength(row.strength) }));
+            const loras = nextRows.map((row) => ({ name: String(row.name || "").trim(), strength: snapStrength(row.strength) }));
             ctx.updateMetadata({ params: { ...(ctx.node.metadata?.params || {}), loras } });
         };
 
@@ -182,7 +183,7 @@ export default function (runtime) {
     return {
         id: "comfyui-lora",
         name: "LoRA 叠层",
-        version: "1.1.0",
+        version: "1.1.1",
         description: "独立的 LoRA 注入卡：最多叠加 10 个 LoRA 并分别调节强度，接到图片或视频节点前。",
         defaultEnabled: true,
         nodes: [

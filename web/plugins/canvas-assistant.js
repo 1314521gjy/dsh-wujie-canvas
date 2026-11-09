@@ -1334,7 +1334,7 @@ export default function (runtime) {
         id: "canvas-assistant",
         name: "画布修复助手",
         version: "0.3.2",
-        description: "画布原生修复 Agent：按需唤起、只读诊断、读源码、提出修改，用户确认后应用、构建并部署；3 分钟无提问自动休眠。已迁移为右下角 AI 桌宠。",
+        description: "画布原生修复 Agent：按需唤起、只读诊断、读源码、提出修改，用户确认后应用、构建并部署；3 分钟无提问自动休眠。",
         defaultEnabled: true,
         css,
         nodes: [
@@ -1347,7 +1347,6 @@ export default function (runtime) {
                 defaultMetadata: {},
                 minimapColor: ACCENT,
                 hasSourceHandle: false,
-                showInCreateMenu: false,
                 Content,
             },
         ],

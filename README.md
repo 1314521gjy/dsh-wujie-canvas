@@ -38,10 +38,13 @@ Desktop DSH: download the release archive and use the in-app plugin manager; if 
 - Proxies the local gateway at `http://127.0.0.1:8190` under the same origin
 - Shows gateway/ComfyUI status in the tab
 - When the local workbench is offline, shows a **启动本机工作台** cover; starting is explicit and uses the installed `start-local.bat`. Nothing starts automatically
-- Does **not** ship or start a built-in Agent. DSH's Agent operates the canvas through:
+- Does **not** ship or start a built-in Agent, and the embedded build does not load the canvas's own AI assistant plugin. DSH's Agent operates the canvas through:
   - `wujie_canvas_status` — workbench/gateway/ComfyUI status
+  - `wujie_canvas_deploy_check` — read-only deployment check: workbench, gateway, ComfyUI, model scan, resource gaps, plus an ordered problem list with fixes
+  - `wujie_canvas_start` — explicit workbench start (launcher, gateway, ComfyUI)
   - `wujie_canvas_state` — project title, nodes (id/type/position/status/prompt/model), connections, selection, viewport
   - `wujie_canvas_apply_ops` — add/update/delete nodes, connect nodes, select, set viewport, run generation
+- Ships a `wujie-canvas-deploy` skill so DSH can walk a first-time deployment or a repair on its own.
 - The canvas page must be open on a project for the state/apply tools. The DSH whale widget is a separate plugin and is not this canvas's Agent.
 
 ## Configuration
@@ -56,7 +59,11 @@ Optional `config` in the profile's `cordis.patch.yml`:
     gateway: 'http://127.0.0.1:8190'
 ```
 
-Workbench discovery order: `workbenchRoot`, `WUJIE_WORKBENCH_ROOT`, the plugin's parent directory, then common `无界工作台` locations.
+Workbench discovery order: `workbenchRoot`, `WUJIE_WORKBENCH_ROOT`, the plugin's parent directory, then common `无界工作台` locations (`~/Documents`, `~/Desktop`, `~`, `C:/D:/E:\无界工作台`, `/opt`, `/usr/local/share`).
+
+Starting the workbench uses `start-local.bat` on Windows, `start-local.sh` on Linux/macOS, and falls back to `node launcher/start.mjs --no-open`.
+
+Canvas projects live in browser storage and are origin-bound: the plugin page (`127.0.0.1:8294`) and the same canvas opened directly (`:3000`) do not share data. Move work between them with the canvas import/export.
 
 ## Development
 
@@ -65,7 +72,7 @@ node --check index.js
 node --check client.js
 ```
 
-The bundled front-end is the production build of the 无界画布 front-end, compiled with `VITE_DSH_EMBEDDED=1` so the canvas's built-in Agent is omitted:
+The bundled front-end must come from the **release tree** (`07842353-release-staging/infinite-canvas/web`, currently v0.24.13), not the development tree — the dev tree carries automation-Agent and other unreleased experiments. Build the release tree with `VITE_DSH_EMBEDDED=1` so the canvas's built-in Agent and `canvas-assistant` plugin are omitted:
 
 ```bash
 VITE_DSH_EMBEDDED=1 npx vite build --outDir ../../dsh-wujie-canvas/web --emptyOutDir

@@ -66,19 +66,27 @@ function delay(ms) {
 }
 
 function isWorkbenchRoot(dir) {
-  return Boolean(dir) && (fs.existsSync(path.join(dir, "start-local.bat")) || fs.existsSync(path.join(dir, "launcher", "start.mjs")));
+  return Boolean(dir) && (
+    fs.existsSync(path.join(dir, "start-local.bat"))
+    || fs.existsSync(path.join(dir, "start-local.sh"))
+    || fs.existsSync(path.join(dir, "launcher", "start.mjs"))
+  );
 }
 
 function resolveWorkbenchRoot(pluginDir, configured) {
+  const home = process.env.USERPROFILE || process.env.HOME || "";
   const candidates = [
     configured,
     process.env.WUJIE_WORKBENCH_ROOT,
     path.resolve(pluginDir, ".."),
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "Documents", "无界工作台") : "",
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "Desktop", "无界工作台") : "",
+    home ? path.join(home, "Documents", "无界工作台") : "",
+    home ? path.join(home, "Desktop", "无界工作台") : "",
+    home ? path.join(home, "无界工作台") : "",
     "C:\\无界工作台",
     "D:\\无界工作台",
     "E:\\无界工作台",
+    "/opt/无界工作台",
+    "/usr/local/share/无界工作台",
   ].filter(Boolean);
   for (const candidate of candidates) {
     try {
@@ -113,36 +121,62 @@ function probeJson(url, timeoutMs = 2500) {
   });
 }
 
-function postJson(url, body, timeoutMs = 15000) {
-  return new Promise((resolve) => {
-    let target;
-    try {
-      target = new URL(url);
-    } catch {
-      resolve({ ok: false, status: 0, json: null, text: "invalid url" });
-      return;
-    }
-    const payload = JSON.stringify(body || {});
-    const transport = target.protocol === "https:" ? https : http;
-    const request = transport.request(target, {
-      method: "POST",
-      timeout: timeoutMs,
-      headers: { "content-type": "application/json", "content-length": Buffer.byteLength(payload) },
-    }, (response) => {
-      let text = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => { text += chunk; });
-      response.on("end", () => {
-        let json = null;
-        try { json = JSON.parse(text); } catch {}
-        resolve({ ok: response.statusCode >= 200 && response.statusCode < 300, status: response.statusCode || 0, json, text });
-      });
-    });
-    request.on("timeout", () => { request.destroy(); resolve({ ok: false, status: 0, json: null, text: "timeout" }); });
-    request.on("error", (error) => resolve({ ok: false, status: 0, json: null, text: error.message }));
-    request.end(payload);
-  });
-}
+const DEPLOY_SKILL = `# 无界画布 · DSH 部署与排障
+
+无界画布在 DSH 里是一个侧栏页面 + 三个本机服务。插件只带前端和代理，不带 ComfyUI、CUDA、模型或 API Key。
+
+## 端口与职责
+
+| 端口 | 服务 | 说明 |
+|---|---|---|
+| 8294 | 插件内置画布服务 | 只绑 127.0.0.1，由插件自动起，占用时会自动换随机端口 |
+| 8190 | comfyui-gateway | 工作台启动器拉起；插件通过 /gateway/ 同源代理 |
+| 8290 | 工作台启动器控制口 | 只有 GET /health 与几个 POST，没有 state/start 接口 |
+| 8188 | ComfyUI | 由启动器或用户自己拉起 |
+
+## 可用工具
+
+- \`wujie_canvas_deploy_check\` — 只读体检：工作台目录、网关、ComfyUI、模型扫描、资源缺口，并给有序问题列表。**先调这个再给结论。**
+- \`wujie_canvas_start\` — 显式启动工作台（含 ComfyUI）。只有用户要求启动或修复离线时才调。
+- \`wujie_canvas_status\` — 轻量状态轮询，启动后用它的 gatewayOk 判断是否就绪。
+- \`wujie_canvas_state\` / \`wujie_canvas_apply_ops\` — 读写画布，要求画布页已打开在某个项目上。
+
+## 首次部署顺序
+
+1. 用户先装好无界工作台（安装器或压缩包），确认目录里有 \`start-local.bat\`（Windows）或 \`launcher/start.mjs\`。
+2. 插件默认按此顺序找目录：配置项 \`workbenchRoot\` → 环境变量 \`WUJIE_WORKBENCH_ROOT\` → 插件父目录 → \`~/Documents/无界工作台\`、\`~/Desktop/无界工作台\`、\`~/无界工作台\` → \`C:/D:/E:\\无界工作台\`。
+3. 找不到就改 profile 的 \`cordis.patch.yml\`：
+
+\`\`\`yaml
+- id: dsh-wujie-canvas
+  config:
+    workbenchRoot: 'D:\\无界工作台'
+    launcherPort: 8290
+    gateway: 'http://127.0.0.1:8190'
+\`\`\`
+
+4. 调 \`wujie_canvas_start\`，再轮询 \`wujie_canvas_status\` 直到 \`gatewayOk: true\`（冷启动通常 30–120 秒）。
+5. \`wujie_canvas_deploy_check\` 确认 \`ok: true\`。
+
+## 问题对照表
+
+| 现象 | 判断 | 处理 |
+|---|---|---|
+| installed=false | 工作台目录不对 | 填 workbenchRoot，别猜路径 |
+| gateway_offline | 8190 不可达 | wujie_canvas_start；仍失败看工作台日志 |
+| comfy_offline | 网关在、8188 不在 | 启动 ComfyUI；确认端口没被改 |
+| no_workflow | 扫描 0 个可用 | 检查模型目录映射，启动器里重新扫描 |
+| resources_missing | 资源索引有缺口 | 启动器资源页下载，或模型下拉自选替换 |
+| setup_stale | 扫描过期 | 启动器重新扫描 |
+| 画布页空白 | 8294 未起 | 重启 DSH 会话；看插件日志有没有端口冲突 |
+| 节点读不到 | 画布没打开项目 | 先在侧栏打开无界画布并进入任意项目 |
+
+## 边界
+
+- 不自动安装 ComfyUI、不下载模型、不写 API Key。
+- 画布项目数据存在浏览器 localStorage，按 origin 隔离：插件页（127.0.0.1:8294）与浏览器直连（:3000）是两套数据，不要承诺互通。
+- 不要为修复问题改 ComfyUI 核心代码或删用户模型。
+`;
 
 const BRIDGE_SCRIPT = `(() => {
   const post = async (id, result) => {
@@ -382,15 +416,15 @@ export function apply(ctx, rawConfig = {}) {
   };
 
   const collectStatus = async () => {
-    const [gatewayHealth, launcherState] = await Promise.all([
+    const [gatewayHealth, launcherHealth] = await Promise.all([
       probeJson(new URL("/health", gateway), 3500),
-      probeJson(new URL("/api/launcher/state", `http://127.0.0.1:${launcherPort}`), 1800),
+      probeJson(new URL("/health", `http://127.0.0.1:${launcherPort}`), 1800),
     ]);
     return {
       ok: true,
       gatewayOk: gatewayHealth.ok,
       comfyOk: gatewayHealth.json?.comfy?.reachable === true,
-      launcherOk: launcherState.ok && launcherState.json?.ok === true,
+      launcherOk: launcherHealth.ok && launcherHealth.json?.ok === true,
       installed: isWorkbenchRoot(workbenchRoot),
       workbenchRoot,
       starting,
@@ -422,30 +456,37 @@ export function apply(ctx, rawConfig = {}) {
     }
     starting = true;
     try {
-      if (current.launcherOk) {
-        const state = await probeJson(new URL("/api/launcher/state", `http://127.0.0.1:${launcherPort}`), 1800);
-        const targetId = String(state.json?.activeTargetId || "");
-        void postJson(new URL("/api/launcher/start", `http://127.0.0.1:${launcherPort}`), { targetId }, 30000).catch((error) => log(`start launcher failed: ${error.message}`));
+      const bat = path.join(workbenchRoot, "start-local.bat");
+      const sh = path.join(workbenchRoot, "start-local.sh");
+      const startScript = path.join(workbenchRoot, "launcher", "start.mjs");
+      if (process.platform === "win32" && fs.existsSync(bat)) {
+        const child = spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", bat, "--no-open"], {
+          cwd: workbenchRoot,
+          detached: true,
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        child.unref();
+      } else if (process.platform !== "win32" && fs.existsSync(sh)) {
+        const child = spawn("sh", [sh, "--no-open"], {
+          cwd: workbenchRoot,
+          detached: true,
+          stdio: "ignore",
+        });
+        child.unref();
+      } else if (fs.existsSync(startScript)) {
+        const localNode = path.join(workbenchRoot, "node", process.platform === "win32" ? "node.exe" : "node");
+        const node = fs.existsSync(localNode) ? localNode : process.execPath;
+        const child = spawn(node, [startScript, "--no-open"], {
+          cwd: workbenchRoot,
+          detached: true,
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        child.unref();
       } else {
-        const bat = path.join(workbenchRoot, "start-local.bat");
-        if (fs.existsSync(bat)) {
-          const child = spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", bat, "--no-open"], {
-            cwd: workbenchRoot,
-            detached: true,
-            stdio: "ignore",
-            windowsHide: true,
-          });
-          child.unref();
-        } else {
-          const node = fs.existsSync(path.join(workbenchRoot, "node", "node.exe")) ? path.join(workbenchRoot, "node", "node.exe") : "node.exe";
-          const child = spawn(node, [path.join(workbenchRoot, "launcher", "start.mjs"), "--no-open"], {
-            cwd: workbenchRoot,
-            detached: true,
-            stdio: "ignore",
-            windowsHide: true,
-          });
-          child.unref();
-        }
+        starting = false;
+        return { ok: false, error: `工作台缺少启动入口：${workbenchRoot}（需要 start-local.bat / start-local.sh 或 launcher/start.mjs）` };
       }
       void waitForGateway(120000);
       log(`starting workbench at ${workbenchRoot}`);
@@ -535,6 +576,90 @@ export function apply(ctx, rawConfig = {}) {
     },
   });
 
+  const collectDiagnostics = async () => {
+    const [gatewayHealth, setup, resources, launcherHealth] = await Promise.all([
+      probeJson(new URL("/health", gateway), 3500),
+      probeJson(new URL("/api/setup/status", gateway), 8000),
+      probeJson(new URL("/api/resources/status", gateway), 10000),
+      probeJson(new URL("/health", `http://127.0.0.1:${launcherPort}`), 1800),
+    ]);
+    const setupStatus = setup.json?.status || null;
+    const summary = resources.json?.summary || null;
+    const installed = isWorkbenchRoot(workbenchRoot);
+    // /health races ComfyUI with a 1.5s timeout; the setup scan has a longer budget, so trust either positive reading.
+    const comfyOk = gatewayHealth.json?.comfy?.reachable === true || setupStatus?.comfyReachable === true;
+    const missingEntry = installed ? "" : "工作台目录缺少 start-local.bat / start-local.sh / launcher/start.mjs";
+    const problems = [];
+    if (!installed) problems.push({ level: "blocker", code: "workbench_missing", message: missingEntry, fix: `安装无界工作台，或在 cordis.patch.yml 的 dsh-wujie-canvas.config.workbenchRoot 里填绝对路径（当前探测值：${workbenchRoot}）` });
+    if (!gatewayHealth.ok) problems.push({ level: "blocker", code: "gateway_offline", message: `网关 ${gateway.href} 不可达`, fix: installed ? "启动本机工作台（wujie_canvas_start），或手动运行 start-local.bat" : "先安装工作台" });
+    if (gatewayHealth.ok && !comfyOk) problems.push({ level: "blocker", code: "comfy_offline", message: "ComfyUI 不可达（网关在线）", fix: "启动或重启 ComfyUI；确认 8188 端口与工作台配置一致" });
+    if (setup.json && setup.json.ok === false) problems.push({ level: "warning", code: "setup_unavailable", message: "网关 /api/setup/status 读取失败", fix: "确认网关版本包含 setup 接口" });
+    if (setupStatus?.lastError) problems.push({ level: "warning", code: "scan_error", message: `模型扫描报错：${setupStatus.lastError}`, fix: "在启动器里重新扫描模型" });
+    if (setupStatus?.counts && setupStatus.counts.available === 0) problems.push({ level: "warning", code: "no_workflow", message: "没有任何可用工作流", fix: "检查模型目录；在启动器体检里看缺什么" });
+    if (summary && Number(summary.missing) > 0) problems.push({ level: "warning", code: "resources_missing", message: `资源索引缺 ${summary.missing} 项（共 ${summary.allResources}）`, fix: "在启动器资源页下载缺失资源，或在模型下拉里自选替换" });
+    if (setupStatus?.stale === true) problems.push({ level: "info", code: "setup_stale", message: "模型扫描结果已过期", fix: "启动器里重新扫描" });
+    return {
+      ok: problems.every((item) => item.level !== "blocker"),
+      platform: process.platform,
+      workbench: { root: workbenchRoot, installed, launcherOk: launcherHealth.ok && launcherHealth.json?.ok === true, launcherPort },
+      gateway: {
+        url: gateway.href,
+        online: gatewayHealth.ok,
+        comfyOk,
+        comfyUrl: gatewayHealth.json?.comfy?.url || setup.json?.comfyUrl || "",
+      },
+      canvas: { port: actualPort, dist: canvasDist, distPresent: fs.existsSync(path.join(canvasDist, "index.html")) },
+      setup: setupStatus ? {
+        phase: setupStatus.phase,
+        comfyReachable: setupStatus.comfyReachable,
+        stale: setupStatus.stale,
+        counts: setupStatus.counts,
+        scanId: setupStatus.scanId,
+        lastError: setupStatus.lastError,
+      } : null,
+      resources: summary ? {
+        indexVersion: resources.json?.indexVersion || "",
+        packs: summary.packs,
+        present: summary.present,
+        missing: summary.missing,
+        missingSize: summary.missingSize,
+        recommendedMissing: summary.recommendedMissing,
+        hardware: resources.json?.hardware || null,
+        comfyRoot: resources.json?.comfyRoot || "",
+      } : null,
+      problems,
+      checklist: [
+        "1. 工作台目录存在且含启动入口",
+        "2. 网关 8190 /health 返回 ok",
+        "3. 网关 /health 里 comfy.reachable 为 true",
+        "4. /api/setup/status 里至少 1 个可用工作流",
+        "5. /api/resources/status 里 missing 为 0（或已自选替换）",
+        "6. DSH 里打开无界画布页并可读节点",
+      ],
+    };
+  };
+
+  const deployCheckTool = () => ({
+    name: "wujie_canvas_deploy_check",
+    description: "Read-only deployment health check for the local 无界画布 stack. Returns workbench presence, gateway/ComfyUI reachability, model scan status, resource gaps, and an ordered problem list with fixes. Starts nothing. Use this before telling the user how to deploy or repair.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    output: textOutput(),
+    async execute() {
+      return { text: JSON.stringify(await collectDiagnostics(), null, 2) };
+    },
+  });
+
+  const startTool = () => ({
+    name: "wujie_canvas_start",
+    description: "Start the local 无界画布 workbench (launcher, gateway and ComfyUI). Explicit action: only call it when the user asks to start or to fix an offline stack. Returns immediately with starting=true; poll wujie_canvas_status until gatewayOk becomes true.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    output: textOutput(),
+    async execute() {
+      const result = await startWorkbench();
+      return { text: JSON.stringify({ ...result, workbenchRoot, launcherPort }, null, 2) };
+    },
+  });
+
   const stateTool = () => ({
     name: "wujie_canvas_state",
     description: "Read the current 无界画布 page: project title, nodes (id/type/position/size/status/prompt/model), connections, selection and viewport. The 无界画布 page must be open in DSH.",
@@ -573,6 +698,8 @@ export function apply(ctx, rawConfig = {}) {
     if (!tools?.register) return;
     try {
       tools.register(statusTool());
+      tools.register(deployCheckTool());
+      tools.register(startTool());
       tools.register(stateTool());
       tools.register(applyTool());
       registeredSessions.add(sessionId);
@@ -581,6 +708,41 @@ export function apply(ctx, rawConfig = {}) {
       log(`tool registration failed for ${sessionId}: ${error.message}`);
     }
   };
+
+  const registerDeploySkill = (registry) => {
+    if (!registry?.registerProvider) return;
+    const candidate = {
+      name: "wujie-canvas-deploy",
+      description: "Deploy, diagnose or repair the local 无界画布 (Wujie Canvas) stack inside DSH: workbench directory discovery, gateway 8190, ComfyUI 8188, model scan, missing resources, and the wujie_canvas_* agent tools. Load when the user asks to install, deploy, start, connect or troubleshoot 无界画布 in DSH, or when the canvas page is offline."
+      + " / 当用户要在 DSH 里部署、启动、连接或排查无界画布（画布打不开、网关/ComfyUI 离线、模型缺失、节点读不到）时加载。",
+      provider: "dsh-wujie-canvas",
+      source: "bundled",
+      rank: 600,
+      locator: null,
+      invocation: { modelInvocable: true, userInvocable: true },
+    };
+    const provider = {
+      name: candidate.provider,
+      list: () => Promise.resolve([candidate]),
+      async get() {
+        const { rank: _rank, locator: _locator, ...summary } = candidate;
+        return { ...summary, content: DEPLOY_SKILL };
+      },
+    };
+    try {
+      const dispose = registry.registerProvider(() => provider);
+      if (typeof dispose === "function" && ctx.effect) ctx.effect(() => dispose, "dsh-wujie-canvas: deploy skill");
+      log("registered deploy skill");
+    } catch (error) {
+      log(`skill registration failed: ${error.message}`);
+    }
+  };
+
+  if (typeof ctx.inject === "function") {
+    ctx.inject(["skills"], (skillCtx) => registerDeploySkill(skillCtx.skills));
+  } else if (ctx.skills) {
+    registerDeploySkill(ctx.skills);
+  }
 
   ctx.on("agent/created", ({ agent } = {}) => registerTools(agent));
   ctx.on("agent/disposed", ({ agent } = {}) => {
