@@ -20,7 +20,7 @@ Prebuilt tarball: https://github.com/1314521gjy/dsh-wujie-canvas/releases/latest
 Web profile, install the release tarball directly:
 
 ```bash
-dsh plugin --profile web add https://github.com/1314521gjy/dsh-wujie-canvas/releases/download/v0.2.0/dsh-wujie-canvas-0.2.0.tgz
+dsh plugin --profile web add https://github.com/1314521gjy/dsh-wujie-canvas/releases/download/v0.3.0/dsh-wujie-canvas-0.3.0.tgz
 ```
 
 If your DSH build only accepts a GitHub source:
