@@ -72,7 +72,7 @@ node --check index.js
 node --check client.js
 ```
 
-The bundled front-end must come from the **release tree** (`07842353-release-staging/infinite-canvas/web`, currently v0.24.13), not the development tree — the dev tree carries automation-Agent and other unreleased experiments. Build the release tree with `VITE_DSH_EMBEDDED=1` so the canvas's built-in Agent and `canvas-assistant` plugin are omitted:
+The bundled front-end must come from the **release tree** (`07842353-release-staging/infinite-canvas/web`, currently v0.25.0), not the development tree — the dev tree carries automation-Agent and other unreleased experiments. Build the release tree with `VITE_DSH_EMBEDDED=1 VITE_LOCAL_ONLY=1 VITE_HIDE_EXPERIMENTAL=1` so the canvas's built-in Agent and `canvas-assistant` plugin are omitted:
 
 ```bash
 VITE_DSH_EMBEDDED=1 npx vite build --outDir ../../dsh-wujie-canvas/web --emptyOutDir

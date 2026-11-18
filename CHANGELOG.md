@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+- Rebuilt the bundled canvas from the v0.25.0 release tree with `VITE_DSH_EMBEDDED=1`, `VITE_LOCAL_ONLY=1` and `VITE_HIDE_EXPERIMENTAL=1`; Viggle is preserved.
+- Added bundled `deploy-repair` and `canvas` skills for deployment/repair and the v0.25.0 canvas feature set.
+- Package contains no pi Agent/assistant runtime, agent workspace, agent-provider credentials or agent resource-card autoInstall entries.
+- DSH remains the only Agent; no automatic agent ensure/start is performed by the plugin.
+
 ## 0.3.0
 
 - New tool `wujie_canvas_deploy_check`: read-only deployment health check (workbench, gateway, ComfyUI, model scan, resource gaps) with an ordered problem list and fixes.

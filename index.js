@@ -709,39 +709,68 @@ export function apply(ctx, rawConfig = {}) {
     }
   };
 
-  const registerDeploySkill = (registry) => {
+  const registerSkills = (registry) => {
     if (!registry?.registerProvider) return;
-    const candidate = {
-      name: "wujie-canvas-deploy",
-      description: "Deploy, diagnose or repair the local 无界画布 (Wujie Canvas) stack inside DSH: workbench directory discovery, gateway 8190, ComfyUI 8188, model scan, missing resources, and the wujie_canvas_* agent tools. Load when the user asks to install, deploy, start, connect or troubleshoot 无界画布 in DSH, or when the canvas page is offline."
-      + " / 当用户要在 DSH 里部署、启动、连接或排查无界画布（画布打不开、网关/ComfyUI 离线、模型缺失、节点读不到）时加载。",
-      provider: "dsh-wujie-canvas",
-      source: "bundled",
-      rank: 600,
-      locator: null,
-      invocation: { modelInvocable: true, userInvocable: true },
+    const readSkill = (relative) => {
+      try { return fs.readFileSync(path.join(pluginDir, relative), "utf8"); } catch { return ""; }
     };
-    const provider = {
-      name: candidate.provider,
-      list: () => Promise.resolve([candidate]),
-      async get() {
-        const { rank: _rank, locator: _locator, ...summary } = candidate;
-        return { ...summary, content: DEPLOY_SKILL };
+    const definitions = [
+      {
+        name: "wujie-canvas-deploy",
+        description: "Deploy, diagnose or repair the local 无界画布 (Wujie Canvas) stack inside DSH: workbench directory discovery, gateway 8190, ComfyUI 8188, model scan, missing resources, and the wujie_canvas_* agent tools. Load when the user asks to install, deploy, start, connect or troubleshoot 无界画布 in DSH, or when the canvas page is offline."
+          + " / 当用户要在 DSH 里部署、启动、连接或排查无界画布（画布打不开、网关/ComfyUI 离线、模型缺失、节点读不到）时加载。",
+        provider: "dsh-wujie-canvas",
+        rank: 600,
+        content: DEPLOY_SKILL,
       },
-    };
-    try {
-      const dispose = registry.registerProvider(() => provider);
-      if (typeof dispose === "function" && ctx.effect) ctx.effect(() => dispose, "dsh-wujie-canvas: deploy skill");
-      log("registered deploy skill");
-    } catch (error) {
-      log(`skill registration failed: ${error.message}`);
+      {
+        name: "deploy-repair",
+        description: "部署、启动和维修 Infinite Canvas 本地画布（ComfyUI + 本地网关 + 前端）：端口起不来、模型或节点缺失、ComfyUI 版本、显存不足、音频 503、3D 500、生成模糊、更新后网关配置丢失时使用。",
+        provider: "dsh-wujie-canvas-repair",
+        rank: 601,
+        content: readSkill("skills/deploy-repair/SKILL.md"),
+      },
+      {
+        name: "canvas",
+        description: "操作 Infinite Canvas 当前网页画布，读取节点、选区、创建文本节点、创建生成流程、连接节点或触发生成；包含 3D 场景、音频卡、视频编辑弹卡、生图加速等新功能说明。",
+        provider: "dsh-wujie-canvas-canvas",
+        rank: 602,
+        content: readSkill("skills/canvas/SKILL.md"),
+      },
+    ];
+    for (const definition of definitions) {
+      if (!definition.content) continue;
+      const candidate = {
+        name: definition.name,
+        description: definition.description,
+        provider: definition.provider,
+        source: "bundled",
+        rank: definition.rank,
+        locator: null,
+        invocation: { modelInvocable: true, userInvocable: true },
+      };
+      const provider = {
+        name: definition.provider,
+        list: () => Promise.resolve([candidate]),
+        async get() {
+          const { rank: _rank, locator: _locator, ...summary } = candidate;
+          return { ...summary, content: definition.content };
+        },
+      };
+      try {
+        const dispose = registry.registerProvider(() => provider);
+        if (typeof dispose === "function" && ctx.effect) ctx.effect(() => dispose, `dsh-wujie-canvas: ${definition.name}`);
+        log(`registered skill ${definition.name}`);
+      } catch (error) {
+        log(`skill registration failed for ${definition.name}: ${error.message}`);
+      }
     }
   };
 
   if (typeof ctx.inject === "function") {
-    ctx.inject(["skills"], (skillCtx) => registerDeploySkill(skillCtx.skills));
+    ctx.inject(["skills"], (skillCtx) => registerSkills(skillCtx.skills));
   } else if (ctx.skills) {
-    registerDeploySkill(ctx.skills);
+    registerSkills(ctx.skills);
   }
 
   ctx.on("agent/created", ({ agent } = {}) => registerTools(agent));

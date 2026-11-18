@@ -1,6 +1,6 @@
 {
   "name": "dsh-wujie-canvas",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "无界画布 in DeepSeek Harness: left-sidebar canvas, local workbench status/start, deploy diagnostics and a bundled deploy skill.",
   "type": "module",
   "main": "index.js",
@@ -32,7 +32,8 @@
     "web",
     "README.md",
     "LICENSE",
-    "NOTICE.md"
+    "NOTICE.md",
+    "skills"
   ],
   "engines": {
     "dsh": ">=0.2.1-rc.1 <0.3.0-0",
